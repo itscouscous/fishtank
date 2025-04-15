@@ -50,6 +50,6 @@ void setup() {
 
 void loop() {
   fncUdpSend((uint16_t) analogRead(potPinX));
-  fncUdpSend(((uint16_t) analogRead(potPinY)) * -1);
+  fncUdpSend(((uint16_t) analogRead(potPinY)) + 32767);
   delay(10);
 }
