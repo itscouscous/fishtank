@@ -9,7 +9,8 @@ const int potPinX = 4;     // Potentiometer
 const int potPinY = 1;     // Potentiometer
 
 
-
+// const char* ssid     = "AirPennNet-Device";
+// const char* password = "penn1740wifi";
 const char* ssid     = "TP-Link_8A8C";
 const char* password = "12488674";
 // const char* ssid     = "esesyno"; // Detkiin
@@ -50,6 +51,6 @@ void setup() {
 
 void loop() {
   fncUdpSend((uint16_t) analogRead(potPinX));
-  fncUdpSend(((uint16_t) analogRead(potPinY)) + 32767);
+  fncUdpSend(((uint16_t) analogRead(potPinY)) + 32768);
   delay(10);
 }
