@@ -33,13 +33,13 @@ char udpBuffer[100]; //buffer can hold up to 100 characters
 // #define WHEEL2_DIR2 6
 
 //x
-#define WHEEL1_PWM 0
-#define WHEEL1_DIR1 7
-#define WHEEL1_DIR2 6
+#define WHEEL1_PWM 1
+#define WHEEL1_DIR1 10
+#define WHEEL1_DIR2 8
 //y
-#define WHEEL2_PWM 1
-#define WHEEL2_DIR1 10
-#define WHEEL2_DIR2 8
+#define WHEEL2_PWM 0
+#define WHEEL2_DIR1 7
+#define WHEEL2_DIR2 6
 
 // variables for PWM init
 const int freq = 30;      // Frequency in Hz
@@ -104,15 +104,12 @@ void makeCarGo(int x, int y){
     //if x is between dzx_max~4095, dutycycle map 0:4095 and dzx_max:4095 and DIRECTION 1
     //if x is between 0~dzx_max, dutycycle map 0:4095 and dzx_max~0 (MAKE SURE ITS INVERSED) and DIRECTION 2
 
-  int duty_y;
-  int duty_x;
-
   if(y <= dzy_max && y >= dzy_min){
     ledcWrite(WHEEL2_PWM, 0);
     Serial.print("\n WHEEL2 duty: 0");
   }else if(y > dzy_max){
-    duty_y = map(y, dzy_max, 4095, 0, 4095);
-    // ledcWrite(WHEEL2_PWM, duty_y);
+    int duty_y = map(y, dzy_max, 4095, 0, 4095);
+    ledcWrite(WHEEL2_PWM, duty_y);
     
     digitalWrite(WHEEL2_DIR1, LOW);
     digitalWrite(WHEEL2_DIR2, HIGH);
@@ -121,8 +118,8 @@ void makeCarGo(int x, int y){
     Serial.println(duty_y);
 
   }else if(y < dzy_min){
-    duty_y = map(y, dzy_min, 0, 0, 4095);
-    // ledcWrite(WHEEL2_PWM, duty_y);
+    int duty_y = map(y, dzy_min, 0, 0, 4095);
+    ledcWrite(WHEEL2_PWM, duty_y);
     
     digitalWrite(WHEEL2_DIR2, LOW);
     digitalWrite(WHEEL2_DIR1, HIGH);
@@ -137,8 +134,8 @@ void makeCarGo(int x, int y){
     ledcWrite(WHEEL1_PWM, 0);
     Serial.print("\n WHEEL1 duty: 0");
   }else if(x > dzx_max){
-    duty_x = map(x, dzx_max, 4095, 0, 4095);
-    // ledcWrite(WHEEL1_PWM, duty_x);
+    int duty_x = map(x, dzx_max, 4095, 0, 4095);
+    ledcWrite(WHEEL1_PWM, duty_x);
     
     digitalWrite(WHEEL1_DIR1, LOW);
     digitalWrite(WHEEL1_DIR2, HIGH);
@@ -147,8 +144,8 @@ void makeCarGo(int x, int y){
     Serial.println(duty_x);
 
   }else if(x < dzx_min){
-    duty_x = map(x, dzx_min, 0, 0, 4095);
-    // ledcWrite(WHEEL1_PWM, duty_x);
+    int duty_x = map(x, dzx_min, 0, 0, 4095);
+    ledcWrite(WHEEL1_PWM, duty_x);
     
     digitalWrite(WHEEL1_DIR2, LOW);
     digitalWrite(WHEEL1_DIR1, HIGH);
@@ -157,10 +154,6 @@ void makeCarGo(int x, int y){
     Serial.println(duty_x);
     
   }
-
-  ledcWrite(WHEEL1_PWM, duty_x);
-  ledcWrite(WHEEL2_PWM, duty_y);
-
   
   // if(y <= dzy_max && y >= dzy_min){
   //   ledcWrite(WHEEL2_PWM, 0);
@@ -186,20 +179,6 @@ void makeCarGo(int x, int y){
   //   Serial.println(duty_y);
     
   // }
-
-    //   int duty_forward = map(y, dzy_max, 4095, 0, 4095);
-    //   int duty_turn = map(y, dzy_max, 4095, 0, 4095);
-
-  // if(duty_forward >= deadzone_ming && duty_forward <= deadzone_max) {
-    //duty_forward = 0; 
-  //}
-    // if(duty_turn >= deadzone_ming && duty_turn <= deadzone_max) {
-    //duty_turn = 0; 
-  //}
-
-    //     ledcWrite(WHEEL1_PWM, duty_forward - duty_turn);
-  //     ledcWrite(WHEEL2_PWM, duty_forward + duty_turn);
-
   
 }
 
