@@ -23,7 +23,8 @@ IPAddress myIP(192, 168, 1, 124);
 
 uint8_t udpBuffer[100];
 
-
+uint16_t x = 0; 
+uint16_t y = 0; 
 
 void handleUDPServer() {
   uint8_t packetBuffer[100];
@@ -32,7 +33,20 @@ void handleUDPServer() {
     UDPServer.read(packetBuffer, 100);
     i = packetBuffer[0] + (packetBuffer[1] << 8); // puts 2 bytes into int
     uint32_t Duty;
-    Serial.println(i); // prints the number (note no need to convert to asii)
+    if(i >= 32767) {
+      y = i - 32767;
+    }
+    else {
+      x = i; 
+    }
+    Serial.print("x: ");
+    Serial.print(x);
+
+    Serial.print(" y: "); // prints the number (note no need to convert to asii)
+    Serial.println(y);
+
+
+
   }
 }
 
