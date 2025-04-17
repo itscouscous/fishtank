@@ -3,7 +3,7 @@
 #define MOTOR_PWM_PIN 0  // Output pin for PWM using LEDC
 #define PWM_FREQ 30     // 1 kHz
 #define PWM_RES_BITS 12     // 10-bit resolution: 0–1023
-#define TARGET_RPM 100      // Desired RPM
+#define TARGET_RPM -100      // Desired RPM
 
 #define WHEEL1DIR1 6
 #define WHEEL1DIR2 7
@@ -57,7 +57,7 @@ void IRAM_ATTR handleEncoderA() {
 void setup() {
   Serial.begin(115200);
 
-  pinMode(ENCODER_A, INPUT_PULLUP);
+  pinMode(ENCODER_A, INPUT);
   //pinMode(ENCODER_B, INPUT_PULLUP);
 
   attachInterrupt(digitalPinToInterrupt(ENCODER_A), handleEncoderA, RISING);
@@ -71,6 +71,12 @@ void setup() {
 
 }
 
+int abs(int num) {
+  if(num < 0) {
+    return -num;
+  }
+  return num;
+}
 
 void loop() {
   
@@ -91,12 +97,26 @@ void loop() {
   static unsigned long lastPrint = 0;
 
   if (micros() - lastPrint >= 100000) {
-
     int currentRPM = rpm;
+    // forward
+    if(TARGET_RPM > 0) {
+      digitalWrite(WHEEL1DIR1, HIGH);
+      digitalWrite(WHEEL1DIR2, LOW);
+    }
+    else {
+      digitalWrite(WHEEL1DIR1, LOW);
+      digitalWrite(WHEEL1DIR2, HIGH);
+      currentRPM = -rpm; 
+    }
+
+    
     //int dir = lastDirection;
 
     // PID calculation
-    int16_t error = TARGET_RPM - currentRPM;
+    int16_t error = abs(TARGET_RPM) - abs(currentRPM);
+    Serial.print("error ");
+    Serial.print(error);
+
     unsigned long now = micros();
     int deltaT = (now - lastPIDUpdateTime);
     integral += error * deltaT;
@@ -116,22 +136,16 @@ void loop() {
     lastError = error;
     lastPIDUpdateTime = now;
 
-    if(TARGET_RPM > 0) {
-      digitalWrite(WHEEL1DIR1, HIGH);
-      digitalWrite(WHEEL1DIR2, LOW);
-    }
-    else {
-      digitalWrite(WHEEL1DIR1, LOW);
-      digitalWrite(WHEEL1DIR2, HIGH);
-    }
+
 
     ledcWrite(MOTOR_PWM_PIN, duty);
 
 
     // Debug print
+    Serial.print(" | output ");
     Serial.print(output);
     Serial.print(" RPM: ");
-    Serial.print(currentRPM, 1);
+    Serial.print(currentRPM);
     Serial.print(" | PWM: ");
     Serial.println(duty);
 
