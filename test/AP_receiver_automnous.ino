@@ -176,9 +176,7 @@ void makeCarGo(int x, int y){
 
   //using controller input to control target RPM
   target_RPM_L = duty_y;
-  set_target_RPM_L(target_RPM_L);
   target_RPM_R = duty_x;
-  set_target_RPM_L(target_RPM_R);
  
 }
 
@@ -354,7 +352,10 @@ void setup() {
 
 void loop() {
   Serial.println("testing serial print");
-  handleUDPServer();
+  //handleUDPServer();
+  //sets target RPM for both wheels
+  set_target_RPM_L(60);
+  set_target_RPM_L(60);
   delay(10);
 
   
