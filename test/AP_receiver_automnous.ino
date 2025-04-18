@@ -177,6 +177,7 @@ void makeCarGo(int x, int y){
   //using controller input to control target RPM
   target_RPM_L = duty_y;
   target_RPM_R = duty_x;
+  //doesn't call set_target_RPM_L or set_target_RPM_R because it is set in the main, not through UDP because it is automnous drive stright mode
  
 }
 
@@ -355,7 +356,7 @@ void loop() {
   //handleUDPServer();
   //sets target RPM for both wheels
   set_target_RPM_L(60);
-  set_target_RPM_L(60);
+  set_target_RPM_R(60);
   delay(10);
 
   
