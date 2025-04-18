@@ -2,9 +2,11 @@
  * sends text udp packet to TargetIP
  *  using station mode (needs router) and static IP
  */
+
+//////// WIFI init ////////
+
 #include <WiFi.h>
 #include <WiFiUdp.h>
-
 
 const char* ssid     = "ESP32-Controller"; 
 const char* password = "esp32pass";  
@@ -13,22 +15,31 @@ IPAddress local_IP(192, 168, 4, 1);
 IPAddress gateway(192, 168, 4, 1);
 IPAddress subnet(255, 255, 255, 0);
 
+WiFiUDP UDPServer;
+
+uint8_t udpBuffer[100];
+
+//////// PINS & VARS init ////////
+
+// x
 #define WHEEL1_PWM 0
 #define WHEEL1_DIR1 7
 #define WHEEL1_DIR2 6
-//y
+
+// y
 #define WHEEL2_PWM 1
 #define WHEEL2_DIR1 8
 #define WHEEL2_DIR2 10
 
-#define ENCODER_A 35
-// #define ENCODER_B 5
+//Encoders
+#define ENCODER_L 35
+#define ENCODER_R 3
 // #define MOTOR_PWM_PIN 0  // Output pin for PWM using LEDC
 // #define PWM_FREQ 30     // 1 kHz
 // #define PWM_RES_BITS 12     // 10-bit resolution: 0–1023
 int target_RPM_L = 0;     // Desired RPM
+int target_RPM_R = 0;     // Desired RPM
 
-const int PPR = 3; // Pulses per revolution from A channel
 
 // PID constants
 float Kp = 1.0;
@@ -36,52 +47,69 @@ float Ki = 0.0;
 float Kd = 0.0;
 
 // PID variables
-volatile int lastDirection = 0; // +1 = CW, -1 = CCW
-volatile unsigned long lastRotationTime = 0;
-volatile int rpm = 0;
-volatile int pulseCount = 0;
+volatile int lastDirectionL = 0; // +1 = CW, -1 = CCW
+volatile int lastDirectionR = 0; // +1 = CW, -1 = CCW
+
+volatile unsigned long lastRotationTimeL = 0;
+volatile unsigned long lastRotationTimeR = 0;
+
+volatile int rpm_L = 0;
+volatile int rpm_R = 0;
+
 
 float lastError = 0;
 float integral = 0;
-unsigned long lastPIDUpdateTime = 0;
-unsigned long lastISRUpdateTime = 0;
-float duty = 0;
+unsigned long lastPIDUpdateTimeL = 0;
+unsigned long lastPIDUpdateTimeR = 0;
+
+unsigned long lastISRUpdateTimeL = 0;
+unsigned long lastISRUpdateTimeR = 0;
+
+float dutyL = 0;
+float dutyR = 0;
 
 
 // variables for PWM init
 const int freq = 50;      // Frequency in Hz
 const int resolution = 12; // 12-bit resolution (0-4095)
 
-
-
-WiFiUDP UDPServer;
-
-
-uint8_t udpBuffer[100];
-
-volatile uint16_t x = 0; 
-volatile uint16_t y = 0; 
+volatile uint16_t x = 0; //received wheel1 value from joystick
+volatile uint16_t y = 0; //received wheel2 value from joystick
 
 volatile int duty_y;
 volatile int duty_x;
 
-void IRAM_ATTR handleEncoderA() {
-  //pulseCount++;
+static unsigned long lastPrintL = 0;
+static unsigned long lastPrintR = 0;
 
-  // Direction
-  //lastDirection = digitalRead(ENCODER_B) ? 1 : -1;
 
+void IRAM_ATTR handleEncoderL() {
   unsigned long now = micros();
-  unsigned long dt = now - lastRotationTime;
-  lastRotationTime = now;
+  unsigned long dt = now - lastRotationTimeL;
+  lastRotationTimeL = now;
 
   if (dt > 0) {
-    rpm = (3.0 * 1000000.0) / dt; //20 ticks per revolution
+    rpm_L = (3.0 * 1000000.0) / dt; //20 ticks per revolution
   }
   else {
-    rpm = 0.0; 
+    rpm_L = 0.0; 
   }
-  lastISRUpdateTime = now;
+  lastISRUpdateTimeL = now;
+  
+}
+
+void IRAM_ATTR handleEncoderR() {
+  unsigned long now = micros();
+  unsigned long dt = now - lastRotationTimeR;
+  lastRotationTimeR = now;
+
+  if (dt > 0) {
+    rpm_R = (3.0 * 1000000.0) / dt; //20 ticks per revolution
+  }
+  else {
+    rpm_R = 0.0; 
+  }
+  lastISRUpdateTimeR = now;
   
 }
 
@@ -146,6 +174,7 @@ void makeCarGo(int x, int y){
   
   target_RPM_L = duty_y;
   set_target_RPM_L(target_RPM_L);
+  Serial.println(duty_y);
 
 
   // ledcWrite(WHEEL1_PWM, duty_y);
@@ -157,21 +186,19 @@ void set_target_RPM_L(int target_RPM_L) {
   volatile unsigned long now = micros();
   volatile unsigned long resetInterval = 2000000;
 
-  if( (now-lastISRUpdateTime) >= resetInterval && (lastISRUpdateTime - now) >= resetInterval){
-    rpm = 0.0;
+  if( (now-lastISRUpdateTimeL) >= resetInterval && (lastISRUpdateTimeL - now) >= resetInterval){
+    rpm_L = 0.0;
     Serial.print("now ");
     Serial.print(now);
     Serial.print(" | lastISRUpdateTime ");
-    Serial.println(lastISRUpdateTime);
+    Serial.println(lastISRUpdateTimeL);
 
-    lastISRUpdateTime = now;
+    lastISRUpdateTimeL = now;
 
   }  
 
-  static unsigned long lastPrint = 0;
-
-  if (micros() - lastPrint >= 100000) {
-    int currentRPM = rpm;
+  if (micros() - lastPrintL >= 100000) {
+    int currentRPM = rpm_L;
     // forward
     if(target_RPM_L > 0) {
       digitalWrite(WHEEL1_DIR1, HIGH);
@@ -180,7 +207,7 @@ void set_target_RPM_L(int target_RPM_L) {
     else {
       digitalWrite(WHEEL1_DIR1, LOW);
       digitalWrite(WHEEL1_DIR2, HIGH);
-      currentRPM = -rpm; 
+      currentRPM = -rpm_L; 
     }
 
     
@@ -196,27 +223,27 @@ void set_target_RPM_L(int target_RPM_L) {
     Serial.print(error);
 
     unsigned long now = micros();
-    int deltaT = (now - lastPIDUpdateTime);
+    int deltaT = (now - lastPIDUpdateTimeL);
     integral += error * deltaT;
     float derivative = (error - lastError);
     float output = Kp * error + Ki * integral + Kd * derivative;
-    duty += output;
-    if (duty > 4095)
+    dutyL += output;
+    if (dutyL > 4095)
     {
-      duty = 4095;
+      dutyL = 4095;
     }
-    else if (duty < 0)
+    else if (dutyL < 0)
     {
-      duty = 0;
+      dutyL = 0;
     }
 
 
     lastError = error;
-    lastPIDUpdateTime = now;
+    lastPIDUpdateTimeL = now;
 
 
 
-    ledcWrite(WHEEL1_PWM, duty);
+    ledcWrite(WHEEL1_PWM, dutyL);
 
 
     // Debug print
@@ -230,7 +257,88 @@ void set_target_RPM_L(int target_RPM_L) {
     Serial.print("target_RPM_L: ");
     Serial.println(target_RPM_L);
 
-    lastPrint = now;
+    lastPrintL = now;
+  }
+
+}
+
+void set_target_RPM_R(int target_RPM_R) {
+  volatile unsigned long now = micros();
+  volatile unsigned long resetInterval = 2000000;
+
+  if( (now-lastISRUpdateTimeR) >= resetInterval && (lastISRUpdateTimeR - now) >= resetInterval){
+    rpm_R = 0.0;
+    Serial.print("now ");
+    Serial.print(now);
+    Serial.print(" | lastISRUpdateTime ");
+    Serial.println(lastISRUpdateTimeR);
+
+    lastISRUpdateTimeR = now;
+
+  }  
+
+
+  if (micros() - lastPrintR >= 100000) {
+    int currentRPM = rpm_R;
+    // forward
+    if(target_RPM_R > 0) {
+      digitalWrite(WHEEL2_DIR1, HIGH);
+      digitalWrite(WHEEL2_DIR2, LOW);
+    }
+    else {
+      digitalWrite(WHEEL2_DIR1, LOW);
+      digitalWrite(WHEEL2_DIR2, HIGH);
+      currentRPM = -rpm_R; 
+    }
+
+    
+    //int dir = lastDirection;
+
+    // PID calculation
+    int16_t error = abs(target_RPM_R) - abs(currentRPM);
+    error = abs(error);
+    if (abs(error) < 1) {
+      error = 0; 
+    }
+    Serial.print("error ");
+    Serial.print(error);
+
+    unsigned long now = micros();
+    int deltaT = (now - lastPIDUpdateTimeR);
+    integral += error * deltaT;
+    float derivative = (error - lastError);
+    float output = Kp * error + Ki * integral + Kd * derivative;
+    dutyR += output;
+    if (dutyR > 4095)
+    {
+      dutyR = 4095;
+    }
+    else if (dutyR < 0)
+    {
+      dutyR = 0;
+    }
+
+
+    lastError = error;
+    lastPIDUpdateTimeR = now;
+
+
+
+    ledcWrite(WHEEL2_PWM, dutyR);
+
+
+    // Debug print
+    // Serial.print(" | output ");
+    // Serial.print(output);
+    Serial.print("RPM: ");
+    Serial.print(currentRPM);
+    // Serial.print(" | PWM: ");
+    // Serial.println(duty);
+    Serial.print(",");
+    Serial.print("target_RPM_R: ");
+    Serial.println(target_RPM_R);
+
+    lastPrintR = now;
   }
 
 }
@@ -241,34 +349,34 @@ void setup() {
   WiFi.softAPConfig(local_IP, gateway, subnet);
   WiFi.softAP(ssid, password);  // Start AP
 
-
-  
   UDPServer.begin(2808);  // 2808 arbitrary UDP port#    
 
+  // WHEEL1 init
   ledcAttach(WHEEL1_PWM, freq, resolution);
   pinMode(WHEEL1_DIR1, OUTPUT);
   pinMode(WHEEL1_DIR2, OUTPUT);
 
-
+  // WHEEL2 init
   ledcAttach(WHEEL2_PWM, freq, resolution);
   pinMode(WHEEL2_DIR1, OUTPUT);
   pinMode(WHEEL2_DIR2, OUTPUT);
 
-  pinMode(ENCODER_A, INPUT);
+  pinMode(ENCODER_L, INPUT);
+  pinMode(ENCODER_R, INPUT);
+
   //pinMode(ENCODER_B, INPUT_PULLUP);
 
-  attachInterrupt(digitalPinToInterrupt(ENCODER_A), handleEncoderA, RISING);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_L), handleEncoderL, RISING);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_R), handleEncoderR, RISING);
 
-  // Set up LEDC PWM
-  // ledcAttach(MOTOR_PWM_PIN, PWM_FREQ, PWM_RES_BITS);
-
-  // pinMode(WHEEL1DIR1, OUTPUT);
-  // pinMode(WHEEL1DIR2, OUTPUT);
 }
 
 void loop() {
-  handleUDPServer();
+  //handleUDPServer();
   delay(10);
+  set_target_RPM_L(60);
+  set_target_RPM_R(60);
+
 
   
 }
