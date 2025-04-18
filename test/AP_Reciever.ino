@@ -42,9 +42,14 @@ int target_RPM_R = 0;     // Desired RPM
 
 
 // PID constants
-float Kp = 1.0;
-float Ki = 0.0;
-float Kd = 0.0;
+float Kp_L = 6.0;
+float Ki_L = 10.0;
+float Kd_L = 0.0;
+
+float Kp_R = 3.0;
+float Ki_R = 1.0;
+float Kd_R = 0.0;
+
 
 // PID variables
 volatile int lastDirectionL = 0; // +1 = CW, -1 = CCW
@@ -226,7 +231,7 @@ void set_target_RPM_L(int target_RPM_L) {
     int deltaT = (now - lastPIDUpdateTimeL);
     integral += error * deltaT;
     float derivative = (error - lastError);
-    float output = Kp * error + Ki * integral + Kd * derivative;
+    float output = Kp_L * error + Ki_L * integral + Kd_L * derivative;
     dutyL += output;
     if (dutyL > 4095)
     {
@@ -307,7 +312,7 @@ void set_target_RPM_R(int target_RPM_R) {
     int deltaT = (now - lastPIDUpdateTimeR);
     integral += error * deltaT;
     float derivative = (error - lastError);
-    float output = Kp * error + Ki * integral + Kd * derivative;
+    float output = Kp_R * error + Ki_R * integral + Kd_R * derivative;
     dutyR += output;
     if (dutyR > 4095)
     {
@@ -368,10 +373,13 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(ENCODER_L), handleEncoderL, RISING);
   attachInterrupt(digitalPinToInterrupt(ENCODER_R), handleEncoderR, RISING);
+  Serial.println("testing serial setup");
+
 
 }
 
 void loop() {
+  Serial.println("testing serial print");
   //handleUDPServer();
   delay(10);
   set_target_RPM_L(60);
