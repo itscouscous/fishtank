@@ -99,26 +99,22 @@ void read_sensors() {
   }
 
   //sensor three reading
-  //if (front_lox.dataReady()) {
-    // new measurement for the taking!
-    int16_t distance;
-    distance = front_lox.distance();
-    if (distance == -1) {
-      // something went wrong!
-      Serial.print(F("Couldn't get distance: "));
-      Serial.println(front_lox.vl_status);
-      return;
-    }
-    Serial.print(F("front distance: "));
-    Serial.print(distance);
-    //Serial.println(" mm");
 
-    // data is read out, time for another reading!
-    front_lox.clearInterrupt();
-  // }
-  // else {
-  //   Serial.println("Front not ready");
-  // }
+  // new measurement for the taking!
+  int16_t distance;
+  distance = front_lox.distance();
+  if (distance == -1) {
+    // something went wrong!
+    Serial.print(F("Couldn't get distance: "));
+    Serial.println(front_lox.vl_status);
+    return;
+  }
+  Serial.print(F("Front Sensor: "));
+  Serial.print(distance);
+
+  // data is read out, time for another reading!
+  front_lox.clearInterrupt();
+
   
   Serial.println();
 }
@@ -144,6 +140,21 @@ void setup() {
   Serial.println(F("Starting..."));
   set_i2C_address();
   Serial.println("done with I2C address");
+
+  Serial.print(F("Sensor ID: 0x"));
+  Serial.println(front_lox.sensorID(), HEX);
+
+  if (! front_lox.startRanging()) {
+    Serial.print(F("Couldn't start ranging: "));
+    Serial.println(front_lox.vl_status);
+    while (1)       delay(10);
+  }
+  Serial.println(F("Ranging started"));
+
+  // Valid timing budgets: 15, 20, 33, 50, 100, 200 and 500ms!
+  front_lox.setTimingBudget(50);
+  Serial.print(F("Timing budget (ms): "));
+  Serial.println(front_lox.getTimingBudget());
 
 
 
