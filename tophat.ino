@@ -3,8 +3,8 @@
 #include <Wire.h>
 
 #define I2C_SLAVE_ADDR 0x28
-#define SDA_PIN 5
-#define SCL_PIN 4
+#define SDA_PIN 9
+#define SCL_PIN 8
 
 void send_I2C_byte(uint8_t data) {
   // Send data to slave
