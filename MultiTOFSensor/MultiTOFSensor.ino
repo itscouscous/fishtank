@@ -43,7 +43,7 @@ void loop() {
   
   // Example of using individual readings for obstacle avoidance
   if (frontDistance > 0 && frontDistance < 200) {
-    Serial.println("Obstacle detected in front!");
+    //Serial.println("Obstacle detected in front!");
   }
   
   delay(100);
