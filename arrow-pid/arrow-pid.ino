@@ -65,6 +65,17 @@ float duty_R = 0.0;
 
 DualEncoder encoders(ENCR_A, ENCR_B, ENCL_A, ENCL_B);  // AR, BR, AL, BL
 
+struct myPID {
+  float Kp, Ki, Kd;
+  float integral = 0;
+  float lastError = 0;
+
+  myPID(float p, float i, float d) : Kp(p), Ki(i), Kd(d) {}
+};
+
+myPID LmotorPID(2, 0.0, 0.06);
+myPID RmotorPID(2, 0.0, 0.06);
+
 
 
 //////// ARROW KEY Functions ////////
@@ -152,17 +163,6 @@ void wheel_Setup(){
   digitalWrite(R_EN, HIGH);
 
 }
-
-struct myPID {
-  float Kp, Ki, Kd;
-  float integral = 0;
-  float lastError = 0;
-
-  myPID(float p, float i, float d) : Kp(p), Ki(i), Kd(d) {}
-};
-
-myPID LmotorPID(2, 0.0, 0.06);
-myPID RmotorPID(2, 0.0, 0.06);
 
 float calc_PID(myPID &pid, int32_t target, int32_t measured) {
   float error = target - measured;
@@ -315,6 +315,6 @@ void setup() {
 
 void loop() {
   h.serve();
-  makeWheelGo();
+  makeWheelsGo();
   delay(10);
 }
