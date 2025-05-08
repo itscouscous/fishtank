@@ -147,7 +147,7 @@ void handleCommand() {
 
 void wheel_Setup(){
 
-  Serial.begin(115200);
+  //Serial.begin(115200);
   encoders.begin();
 
   // Wheel L
