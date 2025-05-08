@@ -268,29 +268,25 @@ void makeCarGo(){
   if (yAxis = 1){
     target_RPM_L = 50;
     target_RPM_R = 50;
-    makeWheelsGo();
   } else if (yAxis = -1){
-    target_RPM_L = 50;
-    target_RPM_R = 50;
-    makeWheelsGo();
+    target_RPM_L = -50;
+    target_RPM_R = -50;
   } else if (yAxis = 0){
     target_RPM_L = 0;
     target_RPM_R = 0;
-    makeWheelsGo();
   }
 
   if (xAxis = 1){
     target_RPM_R = target_RPM_R-50;
-    makeWheelsGo();
   } else if (xAxis = -1){
     target_RPM_L = target_RPM_L-50;
-    makeWheelsGo();
-  } else if (xAxis = 0){
-    makeWheelsGo();
-    //???? hELP
-  }
+  } 
+  // else if (xAxis = 0){
+  //   makeWheelsGo();
+  //   //???? hELP
+  // }
 
-
+  makeWheelsGo();
 
 }
 
@@ -315,6 +311,6 @@ void setup() {
 
 void loop() {
   h.serve();
-  makeWheelsGo();
+  makeCarGo();
   delay(10);
 }
