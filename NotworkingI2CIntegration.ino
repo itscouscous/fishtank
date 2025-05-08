@@ -15,14 +15,12 @@
 #define SDA_PIN 8  // GPIO5 (D1 on NodeMCU)
 #define SCL_PIN 9  // GPIO4 (D2 on NodeMCU)
 
-// objects for the vl53l0x
+// objects for the sensors
 Adafruit_VL53L1X left_lox = Adafruit_VL53L1X();
 Adafruit_VL53L0X right_lox = Adafruit_VL53L0X();
 Adafruit_VL53L1X front_lox = Adafruit_VL53L1X();
 
-
-// this holds the measurement
-//VL53L0X_RangingMeasurementData_t left_measure;
+// this holds the measurement for VL53L0X
 VL53L0X_RangingMeasurementData_t right_measure;
 
 //---------tophat code--------
@@ -50,10 +48,12 @@ uint8_t receive_I2C_byte() {  // data should have space declared from caller
       byteIn = Wire.read();
       Serial.printf("0x%02X ", byteIn);
       Serial.printf(", %d HP", byteIn);
-      // if HP == 0, stop while(HP == 0){ receive bytes? }
     }
     Serial.println();
-  } else return 0;
+  } else {
+    Serial.println("No data received from slave");
+    return 0;
+  }
   return byteIn;  // return number of bytes read
 }
 
@@ -65,177 +65,121 @@ void set_i2C_address() {
   digitalWrite(SHT_RIGHT_SENSOR, LOW);
   digitalWrite(SHT_FRONT_SENSOR, LOW);
   delay(10);
-  // all unreset
-  digitalWrite(SHT_LEFT_SENSOR, HIGH);
-  digitalWrite(SHT_RIGHT_SENSOR, HIGH);
-  digitalWrite(SHT_FRONT_SENSOR, HIGH);
-  delay(10);
-
-  // left sensor
-  digitalWrite(SHT_LEFT_SENSOR, HIGH);
-  digitalWrite(SHT_RIGHT_SENSOR, LOW);
-  digitalWrite(SHT_FRONT_SENSOR, LOW);
   
+  // Activate and configure sensors one by one
+  
+  // Left sensor first
+  digitalWrite(SHT_LEFT_SENSOR, HIGH);
+  delay(10);
   if(!left_lox.begin(LEFT_SENSOR_ADDRESS, &Wire)) {
-    Serial.println(F("Failed to boot first VL53L0X"));
-    while(1);
+    Serial.println(F("Failed to boot left VL53L1X"));
+    while(1); // Critical failure
   }
-
-  delay(10);
   
-  // right sensor
+  // Right sensor second
   digitalWrite(SHT_RIGHT_SENSOR, HIGH);
-  digitalWrite(SHT_FRONT_SENSOR, LOW);
-  digitalWrite(SHT_LEFT_SENSOR, HIGH);
-
   delay(10);
-
   if(!right_lox.begin(RIGHT_SENSOR_ADDRESS, &Wire)) {
-    Serial.println(F("Failed to boot second VL53L0X"));
-    while(1);
+    Serial.println(F("Failed to boot right VL53L0X"));
+    while(1); // Critical failure
   }
-
-  // front sensor
+  
+  // Front sensor third
   digitalWrite(SHT_FRONT_SENSOR, HIGH);
-  digitalWrite(SHT_RIGHT_SENSOR, HIGH);
-  digitalWrite(SHT_LEFT_SENSOR, HIGH);
-
   delay(10);
-
   if(!front_lox.begin(FRONT_SENSOR_ADDRESS, &Wire)) {
-    Serial.println(F("Failed to boot thrid VL53L0X"));
-    while(1);
+    Serial.println(F("Failed to boot front VL53L1X"));
+    while(1); // Critical failure
   }
-  delay(10);
-
 }
 
 void read_sensors() {
-  
-  //left_lox.rangingTest(&left_measure, false); // pass in 'true' to get debug data printout!
-  right_lox.rangingTest(&right_measure, false); // pass in 'true' to get debug data printout!
-
-  // print sensor one reading
-  // Serial.print("Left Sensor: ");
-  // if(left_measure.RangeStatus != 4) {     // if not out of range
-  //   Serial.print(left_measure.RangeMilliMeter);
-  // } else {
-  //   Serial.print("Out of range");
-  // }
-  
-  // Serial.print(F(" "));
-  int16_t Ldistance = left_lox.distance();
-  if (Ldistance == -1) {
-    // something went wrong!
-    Serial.print(F("Couldn't get distance: "));
+  // Read left sensor (VL53L1X)
+  int16_t left_distance = left_lox.distance();
+  if (left_distance == -1) {
+    Serial.print(F("Left sensor error: "));
     Serial.println(left_lox.vl_status);
-    return;
+  } else {
+    Serial.print(F("Left Sensor: "));
+    Serial.print(left_distance);
+    Serial.print(F(" mm, "));
   }
-  Serial.print(F("left Sensor: "));
-  Serial.print(Ldistance);
-
-  // data is read out, time for another reading!
   left_lox.clearInterrupt();
-
-
-
-  // print sensor two reading
+  
+  // Read right sensor (VL53L0X)
+  right_lox.rangingTest(&right_measure, false);
   Serial.print("Right Sensor: ");
   if(right_measure.RangeStatus != 4) {
     Serial.print(right_measure.RangeMilliMeter);
+    Serial.print(F(" mm, "));
   } else {
-    Serial.print("Out of range");
+    Serial.print("Out of range, ");
   }
-
-  //sensor three reading
-
-  // new measurement for the taking!
-  int16_t distance;
-  distance = front_lox.distance();
-  if (distance == -1) {
-    // something went wrong!
-    Serial.print(F("Couldn't get distance: "));
+  
+  // Read front sensor (VL53L1X)
+  int16_t front_distance = front_lox.distance();
+  if (front_distance == -1) {
+    Serial.print(F("Front sensor error: "));
     Serial.println(front_lox.vl_status);
-    return;
+  } else {
+    Serial.print(F("Front Sensor: "));
+    Serial.print(front_distance);
+    Serial.print(F(" mm"));
   }
-  Serial.print(F("Front Sensor: "));
-  Serial.print(distance);
-
-  // data is read out, time for another reading!
   front_lox.clearInterrupt();
-
   
   Serial.println();
 }
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("starting program");
+  Serial.println("Starting program");
 
-  Wire.begin(SDA_PIN, SCL_PIN, 400000);  // Init I2C with custom pins
+  // Initialize I2C
+  Wire.begin(SDA_PIN, SCL_PIN, 400000);
 
-
-
-
-
+  // Setup shutdown pins
   pinMode(SHT_LEFT_SENSOR, OUTPUT);
   pinMode(SHT_RIGHT_SENSOR, OUTPUT);
   pinMode(SHT_FRONT_SENSOR, OUTPUT);
 
-
+  // All sensors in shutdown
   digitalWrite(SHT_LEFT_SENSOR, LOW);
   digitalWrite(SHT_RIGHT_SENSOR, LOW);
   digitalWrite(SHT_FRONT_SENSOR, LOW);
+  delay(10);
 
-  Serial.println(F("Starting..."));
+  Serial.println(F("Initializing sensors..."));
   set_i2C_address();
-  Serial.println("done with I2C address");
+  Serial.println("I2C addresses assigned");
   
-
-
-  Serial.print(F("Sensor ID: 0x"));
-  Serial.println(front_lox.sensorID(), HEX);
-
-  if (! front_lox.startRanging()) {
-    Serial.print(F("Couldn't start ranging: "));
+  // Configure VL53L1X sensors timing budget
+  if (!left_lox.startRanging()) {
+    Serial.print(F("Couldn't start left sensor ranging: "));
+    Serial.println(left_lox.vl_status);
+  } else {
+    left_lox.setTimingBudget(50);
+    Serial.println(F("Left sensor ranging started"));
+  }
+  
+  if (!front_lox.startRanging()) {
+    Serial.print(F("Couldn't start front sensor ranging: "));
     Serial.println(front_lox.vl_status);
-    while (1)       delay(10);
+  } else {
+    front_lox.setTimingBudget(50);
+    Serial.println(F("Front sensor ranging started"));
   }
-  Serial.println(F("Ranging started"));
-
-  // Valid timing budgets: 15, 20, 33, 50, 100, 200 and 500ms!
-  front_lox.setTimingBudget(50);
-  Serial.print(F("Timing budget (ms): "));
-  Serial.println(front_lox.getTimingBudget());
-
-  //-------left-------
-  if (! left_lox.startRanging()) {
-  Serial.print(F("Couldn't start ranging: "));
-  Serial.println(left_lox.vl_status);
-  while (1)       delay(10);
-  }
-  Serial.println(F("Ranging started"));
-
-  // Valid timing budgets: 15, 20, 33, 50, 100, 200 and 500ms!
-  left_lox.setTimingBudget(50);
-  Serial.print(F("Timing budget (ms): "));
-  Serial.println(left_lox.getTimingBudget());
-
-  //Wire.begin(I2C_SLAVE_ADDR); // becomes slave at 0x28
-  // Wire.onReceive(receive_I2C_byte());
-  // Wire.onRequest(send_I2C_byte(4));
-
+  
+  Serial.println(F("Setup complete"));
 }
 
 void loop() {
-  //unsigned long millisLast = millis(); 
   read_sensors();
-  //2hz
-  // if(millis() % 500 == 0) {
-    uint8_t num_packet = 3;
-    send_I2C_byte(num_packet);
-    receive_I2C_byte();
-  // }
+  
+  // Send data to slave device
+  uint8_t num_packet = 3;
+  send_I2C_byte(num_packet);
+  uint8_t response = receive_I2C_byte();
   
   delay(1000);
 }
