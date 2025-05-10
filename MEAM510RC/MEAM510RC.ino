@@ -14,7 +14,7 @@ HTML510Server h(80);
 #define SDA_PIN 8
 #define SCL_PIN 9
 
-#define Servo_Pin 10
+#define SERVO_PIN 20
 
 // Define addresses
 #define LEFT_SENSOR_ADDRESS 0x30
@@ -78,6 +78,8 @@ float duty_R = 0.0;
 float turn = 0.0;
 
 int healthCounter = 100; 
+
+uint8_t num_packet = 0;
 
 DualEncoder encoders(ENCR_A, ENCR_B, ENCL_A, ENCL_B);  // AR, BR, AL, BL
 
@@ -189,8 +191,9 @@ void handleCommand() {
       Serial.print(" F/B: ");
       Serial.println(yAxis);
       //need to decrement health here
-      sensors.send_I2C_byte(1);
-      sensors.receive_I2C_byte();
+      // sensors.send_I2C_byte(1);
+      // sensors.receive_I2C_byte();
+      num_packet++;//*
       healthCounter--; 
       Serial.print("health: ");
       Serial.println(healthCounter);
@@ -212,7 +215,7 @@ void handleTask() {
   int newTask = h.getVal();
   
   // Validate task value (1-5)
-  if (newTask >= 1 && newTask <= 5) {
+  if (newTask >= 1 && newTask <= 6) {
     task = newTask;
     
     // Print task selection to serial
@@ -252,6 +255,7 @@ void handleArm() {
   // Validate arm state
   if (newArmState == 0 || newArmState == 1) {
     activateArm = newArmState;
+    num_packet++;//*
     
     // Print arm state to serial
     Serial.print("Arm state changed to: ");
@@ -323,6 +327,8 @@ void setup() {
   Serial.println("Sensors initialized successfully");
 
   ledcAttach(10, 50, 13);
+
+  pinMode(SERVO_PIN, OUTPUT);
 
 }
 
@@ -410,6 +416,28 @@ void WallFollow()
   }
 }
 
+void moveServo(int pulseWidth){
+  digitalWrite(SERVO_PIN, HIGH);
+  delayMicroseconds(pulseWidth);
+  digitalWrite(SERVO_PIN, LOW);
+  delay(20-pulseWidth/1000);
+}
+
+void activateServo(){
+  //Sweep
+  for (int angle = 0; angle<=180; angle+=8){
+    int pulseWidth = map(angle, 0, 180, 500, 2500);
+    moveServo(pulseWidth);
+    // delay(20);
+  }
+
+  for (int angle = 180; angle >= 0; angle-=8){
+    int pulseWidth = map(angle, 0, 180, 500, 2500);
+    moveServo(pulseWidth);
+    // delay(20);
+  }
+}
+
 void goForward(int dist, int speed) {
   digitalWrite(L_EN, HIGH);
   digitalWrite(R_EN, HIGH);
@@ -484,6 +512,44 @@ void turnRight(int dist, int speed) {
 
 }
 
+void turnLeft(int dist, int speed) {
+  digitalWrite(L_EN, HIGH);
+  digitalWrite(R_EN, HIGH);
+  int currTicksR = encoders.getCountR();
+  int currTicksL = encoders.getCountL();
+  int deltaDist = 0;
+
+  //drive forward 
+  while (deltaDist < dist)
+  {
+      //Encoder read at 100Hz
+    if (micros() - lastEncoderRead > 10000) Sample_RPM(micros() - lastEncoderRead);
+
+      //PID runs at 25Hz
+    if (micros() - LastPID > 40000){
+      int32_t DeltaPID = micros() - LastPID;
+      LastPID = micros();
+      duty_L += calc_PID(LmotorPID, -speed, L_RPM, DeltaPID);
+      duty_R += calc_PID(RmotorPID, speed, R_RPM, DeltaPID);
+      //Clamp
+      if (duty_L >= 1024) duty_L = 1024;
+      else if (duty_L <= -1024) duty_L = -1024;
+
+      if (duty_R >= 1024) duty_R = 1024;
+      else if (duty_R <= -1024) duty_R = -1024;
+
+      set_PWM('L', (int16_t)duty_L);
+      set_PWM('R', (int16_t)duty_R);
+      
+    }
+
+    deltaDist =  -(encoders.getCountL()-currTicksL) + (encoders.getCountR()-currTicksR);
+
+  }
+
+
+}
+
 void stop()
 {
   digitalWrite(L_EN, LOW);
@@ -496,42 +562,196 @@ void stop()
 }
 
 void attack_Lower(int setSpeed) {
-  
+  //note one full revolution of the wheel is 1920 ticks
+  //one full 90 degree turn is around 2300 ticks 
   goForward(4000, 50);
   stop();
   delay(1000);
+
   turnRight(2300, 50);
   stop();
   delay(1000);
+
   goForward(4000, 50);
   stop();
   delay(1000);
-  turnRight(2300, 50);
-  stop();
-  delay(1000);
-  goForward(4000, 50);
-  stop();
-  delay(1000);
-  turnRight(2300, 50);
-  stop();
-  delay(1000);
-  goForward(4000, 50);
-  stop();
-  delay(1000);
-  turnRight(2300, 50);
-  stop();
-  delay(1000);
+  stop(); 
+
+
   task == 1; 
   
 
 }
 
-void loop() {
+void attack_Base(int setSpeed) {
+  //note one full revolution of the wheel is 1920 ticks
+  //one full 90 degree turn is around 2300 ticks 
+  goForward(4000, 50);
+  stop();
+  delay(1000);
+
+  turnLeft(2450, 50);
+  stop();
+  delay(1000);
+
+  goForward(10000, 50);
+  stop();
+  delay(1000);
+  stop(); 
+
+
+  task == 1; 
+  
+
+}
+
+void attack_Upper(int setSpeed) {
+  //note one full revolution of the wheel is 1920 ticks
+  //one full 90 degree turn is around 2300 ticks 
+  goForward(6000, 50);
+  stop();
+  delay(1000);
+
+  turnLeft(2400, 50);
+  stop();
+  delay(1000);
+
+  goForward(11000, 50);
+  stop();
+  delay(1000);
+
+  turnRight(2450, 50);
+  stop();
+  delay(1000);
+
+  goForward(4000, 50);
+  stop();
+  delay(1000);
+
+  turnRight(2300, 50);
+  stop();
+  delay(1000);
+
+  goForward(12500, 50);
+  stop();
+  delay(1000);
+
+  turnLeft(2300, 50);
+  stop();
+  delay(1000);
+
+  goForward(2000, 50);
+  stop();
+  delay(1000);
+  stop(); 
+
+
+  task == 1; 
+  
+
+}
+
+void attack_All(int setSpeed) {
+  //note one full revolution of the wheel is 1920 ticks
+  //one full 90 degree turn is around 2300 ticks 
+  goForward(4000, 50);
+  stop();
+  delay(1000);
+
+  turnRight(2300, 50);
+  stop();
+  delay(1000);
+
+  goForward(4000, 50);
+  stop();
+  delay(1000);
+
+  turnLeft(5000, 50);
+  stop();
+  delay(1000);
+  
+
+
+  
+  goForward(14000, 50);
+  stop();
+  delay(1000);
+
+  turnRight(2450, 50);
+  stop();
+  delay(1000);
+
+  goForward(2000, 50);
+  stop();
+  delay(1000);
+
+  turnLeft(2300, 50);
+  stop();
+  delay(1000);
+
+  goForward(1800, 50);
+  stop();
+  delay(1000);
+
+  turnRight(2400, 50);
+  stop();
+  delay(1000);
+
+  goForward(4000, 50);
+  stop();
+  delay(1000);
+  
+  turnRight(2400, 50);
+  stop();
+  delay(1000);
+
+
+
+  goForward(12800, 50);
+  stop();
+  delay(1000);
+
+  turnLeft(2300, 50);
+  stop();
+  delay(1000);
+
+  goForward(2000, 50);
+  stop();
+  delay(1000);
+  stop(); 
+
+
+  task == 1; 
+  
+
+}
+
+unsigned long lastSendTime = 0;
+
+void loop() { 
+
+  
 
   h.serve();
 
   if (task == 1) RC();
   else if (task ==2) WallFollow();
   else if (task == 3) attack_Lower(50);
+  else if (task == 4) attack_Upper(50);
+  else if (task == 5) attack_Base(50);
+  else if (task == 6) attack_All(50);
+
+  if (activateArm==1) activateServo();
+
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastSendTime >= 500){
+    lastSendTime = currentMillis;
+
+    //uint8_t num_packet = 3;
+    sensors.send_I2C_byte(num_packet);
+    sensors.receive_I2C_byte();
+    num_packet = 0;
+
+  }
 
 }
