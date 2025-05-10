@@ -410,6 +410,121 @@ void WallFollow()
   }
 }
 
+void goForward(int dist, int speed) {
+  digitalWrite(L_EN, HIGH);
+  digitalWrite(R_EN, HIGH);
+  int currTicksR = encoders.getCountR();
+  int currTicksL = encoders.getCountL();
+  int deltaDist = 0;
+
+  //drive forward 
+  while (deltaDist < dist)
+  {
+      //Encoder read at 100Hz
+    if (micros() - lastEncoderRead > 10000) Sample_RPM(micros() - lastEncoderRead);
+
+      //PID runs at 25Hz
+    if (micros() - LastPID > 40000){
+      int32_t DeltaPID = micros() - LastPID;
+      LastPID = micros();
+      duty_L += calc_PID(LmotorPID, speed, L_RPM, DeltaPID);
+      duty_R += calc_PID(RmotorPID, speed, R_RPM, DeltaPID);
+      //Clamp
+      if (duty_L >= 1024) duty_L = 1024;
+      else if (duty_L <= -1024) duty_L = -1024;
+
+      if (duty_R >= 1024) duty_R = 1024;
+      else if (duty_R <= -1024) duty_R = -1024;
+      set_PWM('L', (int16_t)duty_L);
+      set_PWM('R', (int16_t)duty_R);
+      
+    }
+
+    deltaDist =  ((encoders.getCountR()-currTicksR) + (encoders.getCountL()-currTicksL))/2;
+
+  }
+
+
+}
+
+void turnRight(int dist, int speed) {
+  digitalWrite(L_EN, HIGH);
+  digitalWrite(R_EN, HIGH);
+  int currTicksR = encoders.getCountR();
+  int currTicksL = encoders.getCountL();
+  int deltaDist = 0;
+
+  //drive forward 
+  while (deltaDist < dist)
+  {
+      //Encoder read at 100Hz
+    if (micros() - lastEncoderRead > 10000) Sample_RPM(micros() - lastEncoderRead);
+
+      //PID runs at 25Hz
+    if (micros() - LastPID > 40000){
+      int32_t DeltaPID = micros() - LastPID;
+      LastPID = micros();
+      duty_L += calc_PID(LmotorPID, speed, L_RPM, DeltaPID);
+      duty_R += calc_PID(RmotorPID, -speed, R_RPM, DeltaPID);
+      //Clamp
+      if (duty_L >= 1024) duty_L = 1024;
+      else if (duty_L <= -1024) duty_L = -1024;
+
+      if (duty_R >= 1024) duty_R = 1024;
+      else if (duty_R <= -1024) duty_R = -1024;
+      set_PWM('L', (int16_t)duty_L);
+      set_PWM('R', (int16_t)duty_R);
+      
+    }
+
+    deltaDist =  -(encoders.getCountR()-currTicksR) + (encoders.getCountL()-currTicksL);
+
+  }
+
+
+}
+
+void stop()
+{
+  digitalWrite(L_EN, LOW);
+  digitalWrite(R_EN, LOW);
+  set_PWM('L', 0);
+  set_PWM('R', 0);
+  duty_L = 0;
+  duty_R = 0; 
+
+}
+
+void attack_Lower(int setSpeed) {
+  
+  goForward(4000, 50);
+  stop();
+  delay(1000);
+  turnRight(2300, 50);
+  stop();
+  delay(1000);
+  goForward(4000, 50);
+  stop();
+  delay(1000);
+  turnRight(2300, 50);
+  stop();
+  delay(1000);
+  goForward(4000, 50);
+  stop();
+  delay(1000);
+  turnRight(2300, 50);
+  stop();
+  delay(1000);
+  goForward(4000, 50);
+  stop();
+  delay(1000);
+  turnRight(2300, 50);
+  stop();
+  delay(1000);
+  task == 1; 
+  
+
+}
 
 void loop() {
 
@@ -417,5 +532,6 @@ void loop() {
 
   if (task == 1) RC();
   else if (task ==2) WallFollow();
+  else if (task == 3) attack_Lower(50);
 
 }
