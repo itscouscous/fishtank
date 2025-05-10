@@ -91,9 +91,23 @@ struct myPID {
   myPID(float p, float i, float d) : Kp(p), Ki(i), Kd(d) {}
 };
 
-myPID LmotorPID(1, 0.0, 0.01);
-myPID RmotorPID(1, 0.0, 0.01);
-myPID WallFollowingPID(1, 0.0, 0.1);
+
+
+
+
+
+
+myPID LmotorPID(2, 0.0, 0.05);
+myPID RmotorPID(2, 0.0, 0.05);
+myPID WallFollowingPID(2, 0.0, 1);
+
+
+
+
+
+
+
+
 
 float calc_PID(myPID &pid, int32_t target, int32_t measured, int32_t time) {
   float error = target - measured;
@@ -354,10 +368,11 @@ void RC(){
 
 void WallFollow()
 {
-  
+  Serial.println("start");
+  Serial.println(micros());
   target_RPM = 50;
   sensors.readSensors();
-  Serial.println(sensors.getFrontDistance());
+  Serial.println(micros());
   //Encoder read at 100Hz
   if (micros() - lastEncoderRead > 10000) Sample_RPM(micros() - lastEncoderRead);
 
@@ -368,42 +383,21 @@ void WallFollow()
     LastPID = micros();
 
     turn += calc_PID(WallFollowingPID, TargetDistnace, sensors.getLeftDistance(), Delta);
-    if (turn >= 20) turn = 20;
-    else if (turn <= -20) turn = -20;
-      Serial.print(" left distance: "); 
-      Serial.print(sensors.getLeftDistance());
-
-      Serial.print(" front distance: "); 
-      Serial.print(sensors.getFrontDistance());
-
-      Serial.print(" right distance: "); 
-      Serial.print(sensors.getRightDistance());
-     if (sensors.getFrontDistance() <= 300)
+    if (turn >= 30) turn = 30;
+    else if (turn <= -30) turn = -30;
+     if (sensors.getFrontDistance() <= 200)
      {
-       //wall in front, turn left)
-       Serial.print("Hit wall!");
-      Serial.print(sensors.getFrontDistance()); 
-       turn = 50;
+      target_RPM = 0;
+      turn = 50;
      }
 
     Ltarget_RPM = target_RPM + turn;
     Rtarget_RPM = target_RPM - turn;
 
-    Serial.print("turn: "); 
-    Serial.print(turn); 
-    Serial.print(" Ltarget_RPM: "); 
-    Serial.print(Ltarget_RPM);
-    Serial.print(" Rtarget_RPM: ");
-    Serial.print(Rtarget_RPM); 
-
 
     duty_L += calc_PID(LmotorPID, Ltarget_RPM, L_RPM, Delta);
     duty_R += calc_PID(RmotorPID, Rtarget_RPM, R_RPM, Delta);
 
-    Serial.print(" duty_L: ");
-    Serial.print(duty_L); 
-    Serial.print(" duty_R: ");
-    Serial.println(duty_R); 
     //Clamp
     if (duty_L >= 1024) duty_L = 1024;
     else if (duty_L <= -1024) duty_L = -1024;

@@ -37,6 +37,17 @@ bool TOFSensor::begin() {
   if (!setI2CAddresses()) {
     return false;
   }
+
+  // Set timing budget for sensors
+  _front_lox.setTimingBudget(20);
+  _left_lox.setTimingBudget(20);
+
+  // 20 ms ≈ 50 Hz continuous mode:
+  _right_lox.setMeasurementTimingBudgetMicroSeconds(20000);  
+  if (!_right_lox.startRangeContinuous(20)) {
+    Serial.println("Couldn't start continuous on right sensor");
+    return false;
+  }
   
   // Start ranging for front sensor
   if (!_front_lox.startRanging()) {
@@ -52,9 +63,8 @@ bool TOFSensor::begin() {
     return false;
   }
   
-  // Set timing budget for sensors
-  _front_lox.setTimingBudget(50);
-  _left_lox.setTimingBudget(50);
+
+
   
   return true;
 }
@@ -109,35 +119,20 @@ bool TOFSensor::setI2CAddresses() {
 }
 
 bool TOFSensor::readSensors() {
-  // Read right sensor (VL53L0X)
-  _right_lox.rangingTest(&_right_measure, false);
-  if (_right_measure.RangeStatus != 4) {
-    _right_distance = _right_measure.RangeMilliMeter;
-  } else {
-    _right_distance = -1; // Out of range
-  }
-  
-  // Read left sensor (VL53L1X)
-  _left_distance = _left_lox.distance();
-  if (_left_distance == -1) {
-    Serial.print(F("Couldn't get left distance: "));
-    Serial.println(_left_lox.vl_status);
-    _left_distance = INFINITE; 
+  // --- RIGHT (VL53L0X) ---
+  uint16_t r = _right_lox.readRangeResult();
+  _right_distance = (r != 0xFFFF) ? r : INFINITE;
 
-    return false;
-  }
+  // --- LEFT (VL53L1X) ---
+  int32_t d = _left_lox.distance();
+  _left_distance = (d > 0) ? d : INFINITE;
   _left_lox.clearInterrupt();
-  
-  // Read front sensor (VL53L1X)
-  _front_distance = _front_lox.distance();
-  if (_front_distance == -1) {
-    Serial.print(F("Couldn't get front distance: "));
-    Serial.println(_front_lox.vl_status);
-    _front_distance = INFINITE; 
-    return false;
-  }
+
+  // --- FRONT (VL53L1X) ---
+  d = _front_lox.distance();
+  _front_distance = (d > 0) ? d : INFINITE;
   _front_lox.clearInterrupt();
-  
+
   return true;
 }
 
