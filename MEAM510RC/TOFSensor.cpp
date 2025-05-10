@@ -1,4 +1,5 @@
 #include "TOFSensor.h"
+#define INFINITE 8000
 
 TOFSensor::TOFSensor(uint8_t front_pin, uint8_t left_pin, uint8_t right_pin,
                      uint8_t sda_pin, uint8_t scl_pin,
@@ -121,6 +122,8 @@ bool TOFSensor::readSensors() {
   if (_left_distance == -1) {
     Serial.print(F("Couldn't get left distance: "));
     Serial.println(_left_lox.vl_status);
+    _left_distance = INFINITE; 
+
     return false;
   }
   _left_lox.clearInterrupt();
@@ -130,6 +133,7 @@ bool TOFSensor::readSensors() {
   if (_front_distance == -1) {
     Serial.print(F("Couldn't get front distance: "));
     Serial.println(_front_lox.vl_status);
+    _front_distance = INFINITE; 
     return false;
   }
   _front_lox.clearInterrupt();
@@ -162,6 +166,7 @@ void TOFSensor::printDistances() {
     Serial.print(_right_distance);
   } else {
     Serial.print("Out of range");
+    _right_distance = INFINITE; 
   }
   
   Serial.print(F(" | Front Sensor: "));

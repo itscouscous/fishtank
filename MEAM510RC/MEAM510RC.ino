@@ -43,7 +43,7 @@ TOFSensor sensors(
 
 
 const char* ssid = "ArrowController";
-const char* password = "";
+const char* password = "mother";
 
 int xAxis = 0;  // -1: left, 0: center, 1: right
 int yAxis = 0;  // -1: down, 0: center, 1: up
@@ -68,7 +68,7 @@ int32_t LastCountL = 0;
 int16_t R_RPM = 0;
 int16_t L_RPM = 0;
 
-int16_t TargetDistnace = 200;
+int16_t TargetDistnace = 150;
 
 
 int pwmOutput = 0;
@@ -77,7 +77,7 @@ float duty_L = 0.0;
 float duty_R = 0.0;
 float turn = 0.0;
 
-uint8_t healthCounter = 100; 
+int healthCounter = 100; 
 
 DualEncoder encoders(ENCR_A, ENCR_B, ENCL_A, ENCL_B);  // AR, BR, AL, BL
 
@@ -91,14 +91,14 @@ struct myPID {
   myPID(float p, float i, float d) : Kp(p), Ki(i), Kd(d) {}
 };
 
-myPID LmotorPID(2, 0.0, 0.06);
-myPID RmotorPID(2, 0.0, 0.06);
-myPID WallFollowingPID(0.3, 0.0, 0.04);
+myPID LmotorPID(1, 0.0, 0.01);
+myPID RmotorPID(1, 0.0, 0.01);
+myPID WallFollowingPID(1, 0.0, 0.1);
 
-float calc_PID(myPID &pid, int32_t target, int32_t measured) {
+float calc_PID(myPID &pid, int32_t target, int32_t measured, int32_t time) {
   float error = target - measured;
-  pid.integral += error * 0.04;
-  float derivative = (error - pid.lastError) / 0.04;
+  pid.integral += error * (1000000.0/time);
+  float derivative = ((error - pid.lastError) / (1000000.0/time));
   pid.lastError = error;
 
   float PID_output = (pid.Kp * error + pid.Ki * pid.integral + pid.Kd * derivative);
@@ -106,10 +106,10 @@ float calc_PID(myPID &pid, int32_t target, int32_t measured) {
   return PID_output;
 }
 
-void Sample_RPM(){
+void Sample_RPM(int32_t time){
   lastEncoderRead = micros();
-  R_RPM = (encoders.getCountR() - LastCountR)*100*60/30/64;
-  L_RPM = (encoders.getCountL() - LastCountL)*100*60/30/64;
+  R_RPM = (encoders.getCountR() - LastCountR)*(1000000.0/time)*60/30/64;
+  L_RPM = (encoders.getCountL() - LastCountL)*(1000000.0/time)*60/30/64;
   LastCountR = encoders.getCountR();
   LastCountL = encoders.getCountL();
 }
@@ -178,6 +178,8 @@ void handleCommand() {
       sensors.send_I2C_byte(1);
       sensors.receive_I2C_byte();
       healthCounter--; 
+      Serial.print("health: ");
+      Serial.println(healthCounter);
       if(healthCounter <= 0) {
         Serial.println("------------------------I died-----------------------");
       }
@@ -251,9 +253,20 @@ void handleArm() {
 void setupWifi() {
   //Serial.begin(115200);
   Serial.println("Starting Arrow Key Controller");
+
+    // 1) define your new AP network parameters:
+  IPAddress local_IP(192, 168, 5, 69);      // <-- the IP you want your ESP to have
+  IPAddress gateway(192, 168, 5, 69);       // <-- usually same as local_IP
+  IPAddress subnet(255, 255, 255, 0);      // <-- your subnet mask
   
-  // WiFi setup
-  WiFi.mode(WIFI_AP);
+  // 3) apply your custom network config _before_ calling softAP()
+  if (!WiFi.softAPConfig(local_IP, gateway, subnet)) {
+    Serial.println("AP Config Failed!");
+  }
+
+  // 4) start the open AP (no password)
+  WiFi.softAP(ssid);
+
   WiFi.softAP(ssid, ""); // no password
   Serial.println(ssid);
   Serial.print("AP IP address: ");
@@ -311,21 +324,22 @@ void RC(){
   }
 
   //Encoder read at 100Hz
-  if (micros() - lastEncoderRead > 10000) Sample_RPM();
+  if (micros() - lastEncoderRead > 10000) Sample_RPM(micros() - lastEncoderRead);
 
 
   //PID runs at 25Hz
   if (micros() - LastPID > 40000){
+    int32_t DeltaPID = micros() - LastPID;
     LastPID = micros();
 
     target_RPM = yAxis * 100;
 
-    Ltarget_RPM = target_RPM + (xAxis * 75);
-    Rtarget_RPM = target_RPM - (xAxis * 75);
+    Ltarget_RPM = target_RPM + (xAxis * 50);
+    Rtarget_RPM = target_RPM - (xAxis * 50);
 
 
-    duty_L += calc_PID(LmotorPID, Ltarget_RPM, L_RPM);
-    duty_R += calc_PID(RmotorPID, Rtarget_RPM, R_RPM);
+    duty_L += calc_PID(LmotorPID, Ltarget_RPM, L_RPM, DeltaPID);
+    duty_R += calc_PID(RmotorPID, Rtarget_RPM, R_RPM, DeltaPID);
     //Clamp
     if (duty_L >= 1024) duty_L = 1024;
     else if (duty_L <= -1024) duty_L = -1024;
@@ -341,34 +355,55 @@ void RC(){
 void WallFollow()
 {
   
-  target_RPM = 150;
+  target_RPM = 50;
   sensors.readSensors();
   Serial.println(sensors.getFrontDistance());
   //Encoder read at 100Hz
-  if (micros() - lastEncoderRead > 10000) Sample_RPM();
+  if (micros() - lastEncoderRead > 10000) Sample_RPM(micros() - lastEncoderRead);
 
 
   //PID runs at 25Hz
   if (micros() - LastPID > 40000){
+    int32_t Delta = micros() - LastPID;
     LastPID = micros();
 
-    turn += calc_PID(WallFollowingPID, TargetDistnace, sensors.getLeftDistance());
+    turn += calc_PID(WallFollowingPID, TargetDistnace, sensors.getLeftDistance(), Delta);
+    if (turn >= 20) turn = 20;
+    else if (turn <= -20) turn = -20;
+      Serial.print(" left distance: "); 
+      Serial.print(sensors.getLeftDistance());
 
-    if (turn >= 60) turn = 60;
-    else if (turn <= -60) turn = -60;
+      Serial.print(" front distance: "); 
+      Serial.print(sensors.getFrontDistance());
 
-     if (sensors.getFrontDistance() <= 100)
+      Serial.print(" right distance: "); 
+      Serial.print(sensors.getRightDistance());
+     if (sensors.getFrontDistance() <= 300)
      {
        //wall in front, turn left)
+       Serial.print("Hit wall!");
+      Serial.print(sensors.getFrontDistance()); 
        turn = 50;
      }
 
     Ltarget_RPM = target_RPM + turn;
     Rtarget_RPM = target_RPM - turn;
 
+    Serial.print("turn: "); 
+    Serial.print(turn); 
+    Serial.print(" Ltarget_RPM: "); 
+    Serial.print(Ltarget_RPM);
+    Serial.print(" Rtarget_RPM: ");
+    Serial.print(Rtarget_RPM); 
 
-    duty_L += calc_PID(LmotorPID, Ltarget_RPM, L_RPM);
-    duty_R += calc_PID(RmotorPID, Rtarget_RPM, R_RPM);
+
+    duty_L += calc_PID(LmotorPID, Ltarget_RPM, L_RPM, Delta);
+    duty_R += calc_PID(RmotorPID, Rtarget_RPM, R_RPM, Delta);
+
+    Serial.print(" duty_L: ");
+    Serial.print(duty_L); 
+    Serial.print(" duty_R: ");
+    Serial.println(duty_R); 
     //Clamp
     if (duty_L >= 1024) duty_L = 1024;
     else if (duty_L <= -1024) duty_L = -1024;
