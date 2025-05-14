@@ -199,7 +199,7 @@ void handleCommand() {
       Serial.println(healthCounter);
       if(healthCounter <= 0) {
         Serial.println("------------------------I died-----------------------");
-        stop();
+        dieFor15();
         
       }
     }
@@ -210,6 +210,15 @@ void handleCommand() {
   h.sendplain(response);
 }
 
+void dieFor15() {
+  stop();
+  // busy waiting while health recovers after 15 second wait
+  while(sensors.receive_I2C_byte() <= 0) {
+    stop();
+    delay(500);
+  }
+  
+}
 
 // New handler for task selection
 void handleTask() {
