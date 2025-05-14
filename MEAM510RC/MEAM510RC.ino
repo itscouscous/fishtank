@@ -199,6 +199,8 @@ void handleCommand() {
       Serial.println(healthCounter);
       if(healthCounter <= 0) {
         Serial.println("------------------------I died-----------------------");
+        stop();
+        
       }
     }
   }
